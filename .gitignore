@@ -1,0 +1,6 @@
+*.tfstate*
+.terraform
+key
+*.json
+*.lock.hcl
+
