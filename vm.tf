@@ -27,8 +27,9 @@ resource "azurerm_linux_virtual_machine" "tfmyvm" {
   name                = "tfmyvm"
   resource_group_name = azurerm_resource_group.tfdemorg.name
   location            = azurerm_resource_group.tfdemorg.location
-  size                = "Standard_B1ls"
-  admin_username      = "adminuser"
+  #size                = "Standard_B1ls"
+  size           = "Standard_DS1_v2"
+  admin_username = "adminuser"
 
   network_interface_ids = [
     azurerm_network_interface.tfmynic.id,
@@ -47,7 +48,7 @@ resource "azurerm_linux_virtual_machine" "tfmyvm" {
   source_image_reference {
     publisher = "Canonical"
     offer     = "UbuntuServer"
-    sku       = "16.04-LTS"
+    sku       = "18.04-LTS"
     version   = "latest"
   }
 }
@@ -83,7 +84,32 @@ resource "null_resource" "upload_config_db" {
   ]
 }
 
-resource "null_resource" "remote_exec_vm2" {
+resource "time_sleep" "wait_30_seconds_db" {
+  depends_on      = [azurerm_linux_virtual_machine.tfmyvm]
+  create_duration = "30s"
+}
+
+resource "null_resource" "upload_config_sql" {
+
+  provisioner "file" {
+
+    connection {
+      type        = "ssh"
+      user        = "adminuser"
+      host        = azurerm_public_ip.tfmyip.ip_address
+      private_key = tls_private_key.tfprivatekey_ssh.private_key_pem #file("./key")
+    }
+    source      = "mysql"
+    destination = "/home/adminuser"
+  }
+  depends_on = [
+    local_file.private_key,
+    azurerm_linux_virtual_machine.tfmyvm,
+    time_sleep.wait_30_seconds_db
+  ]
+}
+
+resource "null_resource" "remote_exec_vm3" {
 
   provisioner "remote-exec" {
 
@@ -95,16 +121,20 @@ resource "null_resource" "remote_exec_vm2" {
     }
 
     inline = [
-      "sudo apt update",
-      # "echo \"mysql-server-5.7 mysql-server/root_password password root\" | sudo debconf-set-selections",
-      # "echo \"mysql-server-5.7 mysql-server/root_password_again password root\" | sudo debconf-set-selections",
-      "sudo apt install -y mariadb-server",
-      "sudo cat /home/adminuser/mysqld.cnf > /etc/mysql/mariadb.conf.d/mysqld.cnf",
-      "sudo service mysql restart"
+      "sudo apt-get update",
+      "sudo apt-get install -y mysql-server-5.7",
+      "sudo mysql < /home/adminuser/mysql/script/user.sql",
+      "sudo mysql < /home/adminuser/mysql/script/schema.sql",
+      "sudo mysql < /home/adminuser/mysql/script/data.sql",
+      "sudo cp -f /home/adminuser/mysql/mysqld.cnf /etc/mysql/mysql.conf.d/mysqld.cnf",
+      "sudo service mysql restart",
+      "sleep 20",
     ]
+
   }
 
   depends_on = [
+    time_sleep.wait_30_seconds_db,
     null_resource.upload_config_db
   ]
 

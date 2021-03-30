@@ -1,0 +1,9 @@
+CREATE USER IF NOT EXISTS 'mbaterra'@'%' IDENTIFIED BY 'mbaterra';
+
+CREATE DATABASE IF NOT EXISTS mbaterra;
+
+ALTER DATABASE mbaterra
+  DEFAULT CHARACTER SET utf8
+  DEFAULT COLLATE utf8_general_ci;
+
+GRANT ALL PRIVILEGES ON mbaterra.* TO 'mbaterra'@'%' IDENTIFIED BY 'mbaterra';
