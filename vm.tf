@@ -20,9 +20,6 @@ output "tls_private_key" {
 
 }
 
-
-//Create the VM
-
 resource "azurerm_linux_virtual_machine" "tfmyvm" {
   name                = "tfmyvm"
   resource_group_name = azurerm_resource_group.tfdemorg.name
@@ -56,32 +53,11 @@ resource "azurerm_linux_virtual_machine" "tfmyvm" {
 output "public_ip_vm" {
   value = azurerm_public_ip.tfmyip.ip_address
 }
-
 //Spit the key to a file with the specific permissions
 resource "local_file" "private_key" {
   content         = tls_private_key.tfprivatekey_ssh.private_key_pem
   filename        = "key"
   file_permission = "600"
-}
-
-resource "null_resource" "upload_config_db" {
-
-  provisioner "file" {
-
-    connection {
-      type        = "ssh"
-      user        = "adminuser"
-      host        = azurerm_public_ip.tfmyip.ip_address
-      private_key = tls_private_key.tfprivatekey_ssh.private_key_pem #file("./key")
-    }
-
-    source      = "mysqld.cnf"
-    destination = "/home/adminuser/mysqld.cnf"
-  }
-  depends_on = [
-    local_file.private_key,
-    azurerm_linux_virtual_machine.tfmyvm
-  ]
 }
 
 resource "time_sleep" "wait_30_seconds_db" {
@@ -109,7 +85,7 @@ resource "null_resource" "upload_config_sql" {
   ]
 }
 
-resource "null_resource" "remote_exec_vm3" {
+resource "null_resource" "remote_exec_vm" {
 
   provisioner "remote-exec" {
 
@@ -134,8 +110,8 @@ resource "null_resource" "remote_exec_vm3" {
   }
 
   depends_on = [
+    null_resource.upload_config_sql,
     time_sleep.wait_30_seconds_db,
-    null_resource.upload_config_db
   ]
 
 }
